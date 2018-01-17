@@ -1,0 +1,6 @@
+uvloop
+aiodns
+aiohttp
+colorlog
+cerberus
+setproctitle

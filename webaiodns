@@ -1,0 +1,182 @@
+#!/usr/bin/env python3.6
+
+import logging
+from os import getuid
+from argparse import ArgumentParser
+from socket import AF_INET, AF_INET6
+from asyncio import set_event_loop_policy, get_event_loop
+
+from aiohttp import web
+from pprintpp import pformat
+from cerberus import Validator
+from aiodns import DNSResolver
+from uvloop import EventLoopPolicy
+from colorlog import ColoredFormatter
+from setproctitle import setproctitle
+
+
+__version__ = '0.1.0'
+
+log = logging.getLogger(__name__)
+
+
+FORMAT = (
+    '%(asctime)s  %(log_color)s%(levelname)-8s%(reset)s | '
+    '%(log_color)s%(message)s%(reset)s'
+)
+V_LEVELS = {
+    0: logging.ERROR,
+    1: logging.WARNING,
+    2: logging.INFO,
+    3: logging.DEBUG,
+}
+
+
+SCHEMA_DOMAIN_NAME = {
+    'domain_name': {
+        'required': True,
+        'type': 'string',
+        'empty': False,
+        'regex': '^[a-zA-Z\d-]{,63}(\.[a-zA-Z\d-]{,63})*$'
+    }
+}
+
+
+def validate_args(args):
+    """
+    Validate that arguments are valid.
+
+    :param args: An arguments namespace.
+    :type args: :py:class:`argparse.Namespace`
+
+    :return: The validated namespace.
+    :rtype: :py:class:`argparse.Namespace`
+    """
+    stream = logging.StreamHandler()
+    stream.setFormatter(ColoredFormatter(FORMAT))
+
+    level = V_LEVELS.get(args.verbose, logging.DEBUG)
+    logging.basicConfig(handlers=[stream], level=level)
+
+    log.debug('Raw arguments:\n{}'.format(args))
+
+    if args.path is None and args.port is None:
+        args.port = 8084
+    elif args.path is not None and args.port is not None:
+        log.error('Cannot set both --path and --port options')
+        exit(1)
+
+    return args
+
+
+def parse_args(argv=None):
+    """
+    Argument parsing routine.
+
+    :param argv: A list of argument strings.
+    :type argv: list
+
+    :return: A parsed and verified arguments namespace.
+    :rtype: :py:class:`argparse.Namespace`
+    """
+
+    parser = ArgumentParser(
+        description='Web AsyncIO DNS Server'
+    )
+    parser.add_argument(
+        '-v', '--verbose',
+        help='Increase verbosity level',
+        default=0,
+        action='count'
+    )
+    parser.add_argument(
+        '--version',
+        action='version',
+        version='Web AsyncIO DNS v{}'.format(__version__)
+    )
+    parser.add_argument(
+        '--path',
+        help='Unix socket path',
+        default=None,
+    )
+    parser.add_argument(
+        '--port',
+        help='TCP port',
+        default=None,
+    )
+
+    args = parser.parse_args(argv)
+    args = validate_args(args)
+    return args
+
+
+async def handler_dns(request):
+    """
+    aiohttp handler for dns name resolution.
+    """
+
+    # Validate request
+    validator = request.app['validator']
+
+    validated = validator.validated(dict(request.match_info))
+    if not validated:
+        log.warning(
+            'Invalid request: {}'.format(pformat(validator.errors))
+        )
+        return web.Response('', status=400)
+
+    # Execute resolution
+    resolver = request.app['resolver']
+
+    version = AF_INET if request.path.startswith('/ipv4') else AF_INET6
+    result = await resolver.gethostbyname(validated['domain_name'], version)
+
+    if not result:
+        return web.Response('', status=404)
+
+    return web.Response(result, status=200)
+
+
+def main(args):
+    """
+    Application main function.
+
+    :param args: An arguments namespace.
+    :type args: :py:class:`argparse.Namespace`
+
+    :return: Exit code.
+    :rtype: int
+    """
+    log.info('Starting Web AsyncIO DNS {}'.format(__version__))
+    log.info('Started by user uid {}'.format(getuid()))
+
+    # Set process title
+    location = args.port if args.port else args.path
+    setproctitle('webaiodns.{version}@{location}'.format(
+        version=__version__,
+        location=location
+    ))
+
+    # Install uvloop as event loop provider
+    set_event_loop_policy(EventLoopPolicy())
+
+    app = web.Application()
+
+    # Configure application
+    app['resolver'] = DNSResolver(loop=get_event_loop())
+    app['validator'] = Validator(SCHEMA_DOMAIN_NAME)
+
+    # Add routes
+    app.router.add_get(
+        '/ipv4/{domain_name:\d+}', handler_dns
+    )
+    app.router.add_get(
+        '/ipv6/{domain_name:\d+}', handler_dns
+    )
+
+    web.run_app(app, path=args.path, port=args.port)
+
+    return 0
+
+
+__all__ = ['main']
