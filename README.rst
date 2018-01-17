@@ -4,7 +4,12 @@ Web AsyncIO DNS Server
 
 ``webaiodns`` is a REST API for ultrafast DNS resolution.
 
-Implemented in Python 3.6 using AsyncIO and aiohttp.
+Implemented in Python 3.6 using a ultrafast AsyncIO stack including aiohttp_,
+aiodns_, uvloop_, among others.
+
+.. _aiohttp: https://aiohttp.readthedocs.io/
+.. _aiodns: https://github.com/saghul/aiodns
+.. _uvloop: https://github.com/MagicStack/uvloop
 
 
 Endpoints
@@ -68,7 +73,7 @@ In production, run me with::
         --name webaiodns \
         --restart always \
         --publish 8084:8084 \
-        kuralabs/webaiodns:latest bash
+        kuralabs/docker-webaiodns:latest
 
 
 Development
@@ -76,13 +81,13 @@ Development
 
 Build me with::
 
-    docker build --tag kuralabs/webaiodns:latest .
+    docker build --tag kuralabs/docker-webaiodns:latest .
 
 In development, run me with::
 
     docker run --interactive --tty --init \
         --publish 8084:8084 \
-        kuralabs/webaiodns:latest
+        kuralabs/docker-webaiodns:latest
 
 
 License

@@ -2,6 +2,7 @@ ujson
 uvloop
 aiodns
 aiohttp
+cchardet
 colorlog
 cerberus
 pprintpp
