@@ -79,4 +79,4 @@ COPY webaiodns /usr/local/bin/webaiodns
 USER webaiodns
 WORKDIR /home/webaiodns
 EXPOSE 8084/TCP
-CMD webaiodns
+CMD webaiodns -vvv

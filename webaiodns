@@ -10,6 +10,8 @@ from aiohttp import web
 from pprintpp import pformat
 from cerberus import Validator
 from aiodns import DNSResolver
+from aiodns.error import DNSError
+from ujson import dumps as udumps
 from uvloop import EventLoopPolicy
 from colorlog import ColoredFormatter
 from setproctitle import setproctitle
@@ -42,6 +44,18 @@ SCHEMA_DOMAIN_NAME = {
 }
 
 
+def dumps(obj):
+    """
+    JSON dumps helper using ujson.
+
+    :param dict obj: Python object to dump as JSON.
+
+    :return: JSON formatted string.
+    :rtype: str
+    """
+    return udumps(obj, ensure_ascii=False, escape_forward_slashes=False)
+
+
 def validate_args(args):
     """
     Validate that arguments are valid.
@@ -58,7 +72,7 @@ def validate_args(args):
     level = V_LEVELS.get(args.verbose, logging.DEBUG)
     logging.basicConfig(handlers=[stream], level=level)
 
-    log.debug('Raw arguments:\n{}'.format(args))
+    log.debug('Raw arguments: {}'.format(args))
 
     if args.path is None and args.port is None:
         args.port = 8084
@@ -123,18 +137,33 @@ async def handler_dns(request):
         log.warning(
             'Invalid request: {}'.format(pformat(validator.errors))
         )
-        return web.Response('', status=400)
+        return web.json_response(
+            {'error': '400 Bad Request'},
+            dumps=dumps,
+            status=400
+        )
 
     # Execute resolution
     resolver = request.app['resolver']
 
     version = AF_INET if request.path.startswith('/ipv4') else AF_INET6
-    result = await resolver.gethostbyname(validated['domain_name'], version)
+    domain_name = validated['domain_name']
 
-    if not result:
-        return web.Response('', status=404)
+    try:
+        result = await resolver.gethostbyname(domain_name, version)
+    except DNSError:
+        log.warning('Domain name not found: {}'.format(domain_name))
+        return web.json_response(
+            {'error': '404 Not Found'},
+            dumps=dumps,
+            status=404,
+        )
 
-    return web.Response(result, status=200)
+    return web.json_response(
+        {'addresses': result.addresses},
+        dumps=dumps,
+        status=200
+    )
 
 
 def main(args):
@@ -168,10 +197,10 @@ def main(args):
 
     # Add routes
     app.router.add_get(
-        '/ipv4/{domain_name:\d+}', handler_dns
+        '/ipv4/{domain_name}', handler_dns
     )
     app.router.add_get(
-        '/ipv6/{domain_name:\d+}', handler_dns
+        '/ipv6/{domain_name}', handler_dns
     )
 
     web.run_app(app, path=args.path, port=args.port)
@@ -179,4 +208,6 @@ def main(args):
     return 0
 
 
-__all__ = ['main']
+if __name__ == '__main__':
+    args = parse_args()
+    main(args)

@@ -1,6 +1,8 @@
+ujson
 uvloop
 aiodns
 aiohttp
 colorlog
 cerberus
+pprintpp
 setproctitle
