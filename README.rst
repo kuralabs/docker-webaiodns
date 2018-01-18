@@ -15,7 +15,7 @@ aiodns_, uvloop_, among others.
 Endpoints
 =========
 
-:``/ipv6/[domain]``:
+:``[GET] /ipv6/[domain]``:
  Perform a DNS resolution for given domain and return the associated IPv6
  addresses.
 
@@ -27,7 +27,7 @@ Endpoints
          ]
      }
 
-:``/ipv4/[domain]``:
+:``[GET] /ipv4/[domain]``:
  Perform a DNS resolution for given domain and return the associated IPv4
  addresses.
 
