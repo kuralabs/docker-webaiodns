@@ -67,6 +67,7 @@ In production, run me with::
 
     docker stop webaiodns || true
     docker rm webaiodns || true
+    docker pull kuralabs/docker-webaiodns:latest
 
     docker run --detach --init \
         --hostname webaiodns \
