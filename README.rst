@@ -73,6 +73,9 @@ In production, run me with::
         --name webaiodns \
         --restart always \
         --publish 8084:8084 \
+        --env TZ=America/Costa_Rica \
+        --volume /etc/timezone:/etc/timezone:ro \
+        --volume /etc/localtime:/etc/localtime:ro \
         kuralabs/docker-webaiodns:latest
 
 
@@ -88,6 +91,10 @@ In development, run me with::
     docker run --interactive --tty --init \
         --publish 8084:8084 \
         kuralabs/docker-webaiodns:latest
+
+You may inspect the running container with::
+
+    docker exec --interactive --tty --user root [container] bash
 
 
 License
